@@ -65,15 +65,6 @@ def get_doc_retrieval() :
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
-def format_doc_list(docs):
-    idx = 1
-    result = ""
-    for doc in docs :
-        result = result + ( f"DOCUMENT {str(idx)} : {doc.page_content}\n\n" )
-        idx += 1
-    return result
-
-
 def get_retrieval() :
     llm = get_llm()
     retriever = get_doc_retrieval()
@@ -95,36 +86,6 @@ def get_retrieval() :
 
     print( result )
 
-
-def get_retrieval_answer() :
-    from langchain_core.output_parsers import StrOutputParser
-    from langchain_core.prompts import ChatPromptTemplate
-
-    llm = get_llm()
-    retriever = get_doc_retrieval()
-
-    system = """You are an assistant for question-answering tasks.
-        Use the following pieces of retrieved context to answer the question. 
-        If you don't know the answer, just say that you don't know.
-        Use three sentences maximum and keep the answer concise"""
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system),
-            ("human", "question: {question}\n\n context: {context} "),
-        ]
-    )
-
-    # Chain
-    rag_chain = prompt | llm | StrOutputParser()
-
-    # Run
-    question = "What is prompt?"
-    docs = retriever.invoke(question)
-    generation = rag_chain.invoke({"context": docs, "question": question})
-    print(generation)
-
-
 def get_retrival_grader() :
     ### Retrieval Grader
     from langchain_core.output_parsers import JsonOutputParser
@@ -133,19 +94,17 @@ def get_retrival_grader() :
     llm = get_llm()
     retriever = get_doc_retrieval()
 
-    system = """You are a grader assessing relevance of a retrieved documents to a user question.
-        If each document contains keywords related to the user question, grade it as relevant.
-        It does not need to be a stringent test. 
-        The goal is to filter out erroneous retrievals.
-        Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question.
-        Score must be provided each documents.
+    system = """You are a grader assessing relevance of a retrieved document to a user question.
+        If the document contains keywords related to the user question, grade it as relevant.
+        It does not need to be a stringent test. The goal is to filter out erroneous retrievals. \n
+        Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question. \n
         Provide the binary score as a JSON with a single key 'score' and no premable or explanation.
         """
 
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", system),
-            ("human", "question: {question}\n\n documents: \n\n{document} "),
+            ("human", "question: {question}\n\n document: {document} "),
         ]
     )
 
@@ -154,52 +113,51 @@ def get_retrival_grader() :
     docs = retriever.invoke(question)
 
     doc_txt = docs[0].page_content
-    print(retrieval_grader.invoke({"question": question, "document": format_doc_list( docs )}))
+    print(retrieval_grader.invoke({"question": question, "document": doc_txt}))
 
+    print( prompt )
 
-def get_retrieval_hallucination_grader() :
-    ### Hallucination Grader
-    from langchain_core.output_parsers import JsonOutputParser
-    from langchain_core.prompts import ChatPromptTemplate
+def get_joke() :
 
     llm = get_llm()
-    retriever = get_doc_retrieval()
+    # retriever = get_doc_retrieval()
 
-    question = "What is prompt?"
-    docs = retriever.invoke(question)
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import PromptTemplate
 
-    system = """You are a grader assessing whether an answer is grounded in / supported by a set of facts. 
-        Give a binary 'yes' or 'no' score to indicate whether the answer is grounded in / supported by a set of facts. 
-        Provide the binary score as a JSON with a single key 'score' and no preamble or explanation."""
+    joke_query = "Tell me a joke."
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system),
-            ("human", "documents: {documents}\n\n answer: {generation} "),
-        ]
+    parser = JsonOutputParser()
+
+    prompt = PromptTemplate(
+        template="""You are an assistant for question-answering tasks.
+        If you don't know the answer, just say that you don't know.
+        Use three sentences maximum and keep the answer concise.
+        {format_instructions}
+        {query}
+        """,
+
+        input_variables=["query"],
+        partial_variables={"format_instructions": parser.get_format_instructions()},
     )
 
-    hallucination_grader = prompt | llm | JsonOutputParser()
-    hallucination_grader.invoke({"documents": docs, "generation": generation})
+    chain = prompt | llm | parser
+
+    result = chain.invoke({"query": joke_query})
+
+    print( result )
+
+
+
 
 
 if __name__ == '__main__':
     # doc_retrieval("What is Task Decomposition?")
     #
     # get_retrieval()
-    get_retrieval_answer()
 
     # get_retrival_grader()
 
 
     # get_joke()
-
-    # retriever = get_doc_retrieval()
-    #
-    # question = "What is prompt?"
-    # docs = retriever.invoke(question)
-    # print( len( docs ) )
-    # print( format_doc_list( docs ) )
-    #
-    #
-
+    pass
